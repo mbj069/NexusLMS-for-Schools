@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     }
     // Note: if the same email exists in multiple schools, the school-scoped
     // account takes precedence over the platform account.
-    const user = get<UserRow>(
+    const user = await get<UserRow>(
       "SELECT id, schoolId, name, email, passwordHash, role FROM users WHERE email = ? ORDER BY schoolId DESC LIMIT 1",
       String(email).toLowerCase().trim()
     );

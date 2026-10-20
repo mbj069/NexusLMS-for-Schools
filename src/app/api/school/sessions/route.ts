@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth("TEACHER");
     const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
-    const rows = all<{
+    const rows = await all<{
       id: string;
       name: string;
       isCurrent: number;
@@ -37,15 +37,15 @@ export async function POST(req: NextRequest) {
     if (!name || !startDate || !endDate) {
       return NextResponse.json({ error: "Name, start date and end date are required" }, { status: 400 });
     }
-    if (get("SELECT id FROM academic_sessions WHERE schoolId = ? AND name = ?", schoolId, String(name).trim())) {
+    if (await get("SELECT id FROM academic_sessions WHERE schoolId = ? AND name = ?", schoolId, String(name).trim())) {
       return NextResponse.json({ error: "A session with that name already exists" }, { status: 409 });
     }
     const id = uid();
-    transaction(() => {
+    await transaction(async () => {
       if (isCurrent) {
-        run("UPDATE academic_sessions SET isCurrent = 0 WHERE schoolId = ?", schoolId);
+        await run("UPDATE academic_sessions SET isCurrent = 0 WHERE schoolId = ?", schoolId);
       }
-      run(
+      await run(
         "INSERT INTO academic_sessions (id, schoolId, name, startDate, endDate, isCurrent) VALUES (?,?,?,?,?,?)",
         id,
         schoolId,
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         isCurrent ? 1 : 0
       );
     });
-    run(
+    await run(
       "INSERT INTO audit_logs (id, schoolId, userId, action, entity, entityId, createdAt) VALUES (?,?,?,?,?,?,?)",
       uid(),
       schoolId,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       id,
       nowIso()
     );
-    const created = get("SELECT id, name, isCurrent FROM academic_sessions WHERE id = ?", id) as {
+    const created = await get("SELECT id, name, isCurrent FROM academic_sessions WHERE id = ?", id) as {
       id: string;
       name: string;
       isCurrent: number;

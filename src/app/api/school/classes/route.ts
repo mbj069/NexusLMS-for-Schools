@@ -8,15 +8,16 @@ export async function GET(req: NextRequest) {
     const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
     const sessionId = req.nextUrl.searchParams.get("sessionId");
 
-    const classRows = all<{ id: string; name: string; sessionId: string }>(
+    const classRows = await all<{ id: string; name: string; sessionId: string }>(
       sessionId
         ? "SELECT id, name, sessionId FROM classes WHERE schoolId = ? AND sessionId = ? ORDER BY name ASC"
         : "SELECT id, name, sessionId FROM classes WHERE schoolId = ? ORDER BY name ASC",
       ...(sessionId ? [schoolId, sessionId] : [schoolId])
     );
 
-    const classes = classRows.map((c) => {
-      const sections = all<{
+    const classes = await Promise.all(
+      classRows.map(async (c) => {
+        const sections = await all<{
         id: string;
         name: string;
         teacherId: string | null;
@@ -42,7 +43,8 @@ export async function GET(req: NextRequest) {
           _count: { enrollments: s.enrollmentCount, classSubjects: s.subjectCount },
         })),
       };
-    });
+      })
+    );
 
     return NextResponse.json({ classes });
   } catch (e) {
@@ -59,18 +61,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name and session are required" }, { status: 400 });
     }
     // Tenant check: the session must belong to this school
-    const acad = get("SELECT id FROM academic_sessions WHERE id = ? AND schoolId = ?", sessionId, schoolId);
+    const acad = await get("SELECT id FROM academic_sessions WHERE id = ? AND schoolId = ?", sessionId, schoolId);
     if (!acad) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
     const names: string[] =
       Array.isArray(sections) && sections.length > 0 ? sections : ["A"];
     const classId = uid();
     try {
-      transaction(() => {
-        run("INSERT INTO classes (id, schoolId, sessionId, name) VALUES (?,?,?,?)",
+      await transaction(async () => {
+        await run("INSERT INTO classes (id, schoolId, sessionId, name) VALUES (?,?,?,?)",
           classId, schoolId, sessionId, String(name).trim());
         for (const s of names) {
-          run("INSERT INTO sections (id, schoolId, classId, name) VALUES (?,?,?,?)",
+          await run("INSERT INTO sections (id, schoolId, classId, name) VALUES (?,?,?,?)",
             uid(), schoolId, classId, String(s).trim() || "A");
         }
       });
@@ -80,11 +82,11 @@ export async function POST(req: NextRequest) {
       }
       throw e;
     }
-    run(
+    await run(
       "INSERT INTO audit_logs (id, schoolId, userId, action, entity, entityId, createdAt) VALUES (?,?,?,?,?,?,?)",
       uid(), schoolId, session.userId, "class.created", "Class", classId, nowIso()
     );
-    const createdSections = all<{ id: string; name: string }>(
+    const createdSections = await all<{ id: string; name: string }>(
       "SELECT id, name FROM sections WHERE classId = ? ORDER BY name ASC", classId
     );
     return NextResponse.json(

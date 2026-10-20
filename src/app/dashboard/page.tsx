@@ -15,8 +15,8 @@ function Card({ title, value, hint }: { title: string; value: string | number; h
   );
 }
 
-function count(table: string, schoolId: string, extra = ""): number {
-  const row = get<{ n: number }>(
+async function count(table: string, schoolId: string, extra = ""): Promise<number> {
+  const row = await get<{ n: number }>(
     `SELECT COUNT(*) AS n FROM ${table} WHERE schoolId = ? ${extra}`,
     schoolId
   );
@@ -30,12 +30,12 @@ export default async function DashboardPage() {
   const schoolId = session.schoolId!;
 
   if (session.role === "SCHOOL_ADMIN") {
-    const teachers = count("users", schoolId, "AND role = 'TEACHER'");
-    const students = count("users", schoolId, "AND role = 'STUDENT'");
-    const parents = count("users", schoolId, "AND role = 'PARENT'");
-    const admins = count("users", schoolId, "AND role = 'SCHOOL_ADMIN'");
-    const classes = count("classes", schoolId);
-    const sessions = all<{ id: string; name: string; isCurrent: number }>(
+    const teachers = await count("users", schoolId, "AND role = 'TEACHER'");
+    const students = await count("users", schoolId, "AND role = 'STUDENT'");
+    const parents = await count("users", schoolId, "AND role = 'PARENT'");
+    const admins = await count("users", schoolId, "AND role = 'SCHOOL_ADMIN'");
+    const classes = await count("classes", schoolId);
+    const sessions = await all<{ id: string; name: string; isCurrent: number }>(
       "SELECT id, name, isCurrent FROM academic_sessions WHERE schoolId = ? ORDER BY startDate DESC LIMIT 5",
       schoolId
     );
@@ -70,7 +70,7 @@ export default async function DashboardPage() {
   }
 
   if (session.role === "TEACHER") {
-    const teaching = all<{
+    const teaching = await all<{
       id: string;
       subjectName: string;
       sectionName: string;
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
   }
 
   if (session.role === "STUDENT") {
-    const enrollments = all<{
+    const enrollments = await all<{
       id: string;
       rollNumber: string | null;
       sectionName: string;
@@ -132,7 +132,7 @@ export default async function DashboardPage() {
        WHERE e.studentId = ?`,
       session.userId
     );
-    const subjects = all<{ subjectName: string; teacherName: string; sectionId: string }>(
+    const subjects = await all<{ subjectName: string; teacherName: string; sectionId: string }>(
       `SELECT sub.name AS subjectName, t.name AS teacherName, cs.sectionId
        FROM class_subjects cs
        JOIN subjects sub ON sub.id = cs.subjectId
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
   }
 
   // PARENT
-  const links = all<{
+  const links = await all<{
     studentId: string;
     studentName: string;
     sectionName: string | null;

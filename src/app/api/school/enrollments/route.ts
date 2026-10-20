@@ -8,14 +8,14 @@ export async function GET(req: NextRequest) {
     const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
     const sectionId = req.nextUrl.searchParams.get("sectionId");
     if (!sectionId) return NextResponse.json({ error: "sectionId is required" }, { status: 400 });
-    const section = get("SELECT id FROM sections WHERE id = ? AND schoolId = ?", sectionId, schoolId);
+    const section = await get("SELECT id FROM sections WHERE id = ? AND schoolId = ?", sectionId, schoolId);
     if (!section) return NextResponse.json({ error: "Section not found" }, { status: 404 });
-    const enrollments = all<{ id: string; rollNumber: string | null; studentId: string; studentName: string }>(
+    const enrollments = (await all<{ id: string; rollNumber: string | null; studentId: string; studentName: string }>(
       `SELECT e.id, e.rollNumber, u.id AS studentId, u.name AS studentName
        FROM enrollments e JOIN users u ON u.id = e.studentId
        WHERE e.sectionId = ? ORDER BY e.rollNumber ASC`,
       sectionId
-    ).map((r) => ({
+    )).map((r) => ({
       id: r.id,
       rollNumber: r.rollNumber,
       student: { id: r.studentId, name: r.studentName },
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
     if (!sectionId || !studentId) {
       return NextResponse.json({ error: "Section and student are required" }, { status: 400 });
     }
-    const section = get("SELECT id FROM sections WHERE id = ? AND schoolId = ?", sectionId, schoolId);
-    const student = get(
+    const section = await get("SELECT id FROM sections WHERE id = ? AND schoolId = ?", sectionId, schoolId);
+    const student = await get(
       "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'STUDENT'",
       studentId, schoolId
     );
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
     const id = uid();
     try {
-      run(
+      await run(
         "INSERT INTO enrollments (id, schoolId, studentId, sectionId, rollNumber) VALUES (?,?,?,?,?)",
         id, schoolId, studentId, sectionId, rollNumber?.trim() || null
       );

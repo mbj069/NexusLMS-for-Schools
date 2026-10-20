@@ -25,7 +25,7 @@ interface SchoolRow {
 export async function GET() {
   try {
     await requireAuth("SUPER_ADMIN");
-    const rows = all<SchoolRow>(
+    const rows = await all<SchoolRow>(
       `SELECT s.id, s.name, s.slug, s.phone, s.createdAt,
         (SELECT COUNT(*) FROM users u WHERE u.schoolId = s.id) AS userCount,
         (SELECT COUNT(*) FROM academic_sessions a WHERE a.schoolId = s.id) AS sessionCount
@@ -57,11 +57,11 @@ export async function POST(req: NextRequest) {
     if (!finalSlug) {
       return NextResponse.json({ error: "Could not derive a URL slug from the name" }, { status: 400 });
     }
-    if (get("SELECT id FROM schools WHERE slug = ?", finalSlug)) {
+    if (await get("SELECT id FROM schools WHERE slug = ?", finalSlug)) {
       return NextResponse.json({ error: "That URL slug is already taken" }, { status: 409 });
     }
     const id = uid();
-    run(
+    await run(
       "INSERT INTO schools (id, name, slug, logoUrl, primaryColor, phone, address, createdAt) VALUES (?,?,?,?,?,?,?,?)",
       id,
       name.trim(),
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       address?.trim() || null,
       nowIso()
     );
-    run(
+    await run(
       "INSERT INTO audit_logs (id, schoolId, userId, action, entity, entityId, createdAt) VALUES (?,?,?,?,?,?,?)",
       uid(),
       null,
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       id,
       nowIso()
     );
-    const school = get("SELECT id, name, slug, phone, createdAt FROM schools WHERE id = ?", id);
+    const school = await get("SELECT id, name, slug, phone, createdAt FROM schools WHERE id = ?", id);
     return NextResponse.json({ school }, { status: 201 });
   } catch (e) {
     if (isUniqueViolation(e)) {

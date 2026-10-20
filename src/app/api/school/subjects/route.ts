@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth("TEACHER");
     const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
-    const subjects = all("SELECT id, name, code FROM subjects WHERE schoolId = ? ORDER BY name ASC", schoolId);
+    const subjects = await all("SELECT id, name, code FROM subjects WHERE schoolId = ? ORDER BY name ASC", schoolId);
     return NextResponse.json({ subjects });
   } catch (e) {
     return toErrorResponse(e);
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (!name) return NextResponse.json({ error: "Subject name is required" }, { status: 400 });
     const id = uid();
     try {
-      run("INSERT INTO subjects (id, schoolId, name, code) VALUES (?,?,?,?)",
+      await run("INSERT INTO subjects (id, schoolId, name, code) VALUES (?,?,?,?)",
         id, schoolId, String(name).trim(), code?.trim() || null);
     } catch (e) {
       if (isUniqueViolation(e)) {

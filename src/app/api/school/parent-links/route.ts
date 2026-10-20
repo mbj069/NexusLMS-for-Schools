@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await requireAuth("SCHOOL_ADMIN");
     const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
-    const links = all<{
+    const links = (await all<{
       id: string;
       parentId: string;
       parentName: string;
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
        JOIN users s ON s.id = pc.studentId
        WHERE pc.schoolId = ? ORDER BY p.name ASC`,
       schoolId
-    ).map((r) => ({
+    )).map((r) => ({
       id: r.id,
       parent: { id: r.parentId, name: r.parentName },
       student: { id: r.studentId, name: r.studentName },
@@ -38,10 +38,10 @@ export async function POST(req: NextRequest) {
     if (!parentId || !studentId) {
       return NextResponse.json({ error: "Parent and student are required" }, { status: 400 });
     }
-    const parent = get(
+    const parent = await get(
       "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'PARENT'", parentId, schoolId
     );
-    const student = get(
+    const student = await get(
       "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'STUDENT'", studentId, schoolId
     );
     if (!parent || !student) {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
     const id = uid();
     try {
-      run("INSERT INTO parent_children (id, schoolId, parentId, studentId) VALUES (?,?,?,?)",
+      await run("INSERT INTO parent_children (id, schoolId, parentId, studentId) VALUES (?,?,?,?)",
         id, schoolId, parentId, studentId);
     } catch (e) {
       if (isUniqueViolation(e)) {

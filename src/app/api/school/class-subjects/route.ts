@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     }
     sql += " ORDER BY sub.name ASC";
 
-    const rows = all<{
+    const rows = await all<{
       id: string;
       subjectName: string;
       teacherId: string;
@@ -62,11 +62,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Section, subject and teacher are required" }, { status: 400 });
     }
     // Tenant checks: all three must belong to this school
-    const section = get("SELECT id FROM sections WHERE id = ? AND schoolId = ?", sectionId, schoolId);
-    const subject = get<{ id: string; name: string }>(
+    const section = await get("SELECT id FROM sections WHERE id = ? AND schoolId = ?", sectionId, schoolId);
+    const subject = await get<{ id: string; name: string }>(
       "SELECT id, name FROM subjects WHERE id = ? AND schoolId = ?", subjectId, schoolId
     );
-    const teacher = get<{ id: string; name: string }>(
+    const teacher = await get<{ id: string; name: string }>(
       "SELECT id, name FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER'", teacherId, schoolId
     );
     if (!section || !subject || !teacher) {
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     }
     const id = uid();
     try {
-      run(
+      await run(
         "INSERT INTO class_subjects (id, schoolId, sectionId, subjectId, teacherId) VALUES (?,?,?,?,?)",
         id, schoolId, sectionId, subjectId, teacherId
       );

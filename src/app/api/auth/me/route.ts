@@ -8,7 +8,7 @@ export async function GET() {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
     const school = session.schoolId
-      ? get<{ name: string }>("SELECT name FROM schools WHERE id = ?", session.schoolId)
+      ? await get<{ name: string }>("SELECT name FROM schools WHERE id = ?", session.schoolId)
       : null;
     return NextResponse.json({
       name: session.name,

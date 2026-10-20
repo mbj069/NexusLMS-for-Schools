@@ -11,12 +11,12 @@ export async function GET(req: NextRequest) {
     const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
     const role = req.nextUrl.searchParams.get("role");
     const users = role
-      ? all(
+      ? await all(
           "SELECT id, name, email, role, phone, createdAt FROM users WHERE schoolId = ? AND role = ? ORDER BY createdAt DESC",
           schoolId,
           role
         )
-      : all(
+      : await all(
           "SELECT id, name, email, role, phone, createdAt FROM users WHERE schoolId = ? ORDER BY createdAt DESC",
           schoolId
         );
@@ -41,11 +41,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
     const emailNorm = String(email).toLowerCase().trim();
-    if (get("SELECT id FROM users WHERE schoolId = ? AND email = ?", schoolId, emailNorm)) {
+    if (await get("SELECT id FROM users WHERE schoolId = ? AND email = ?", schoolId, emailNorm)) {
       return NextResponse.json({ error: "That email is already registered in this school" }, { status: 409 });
     }
     const id = uid();
-    run(
+    await run(
       "INSERT INTO users (id, schoolId, name, email, passwordHash, role, phone, createdAt) VALUES (?,?,?,?,?,?,?,?)",
       id,
       schoolId,
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       phone?.trim() || null,
       nowIso()
     );
-    run(
+    await run(
       "INSERT INTO audit_logs (id, schoolId, userId, action, entity, entityId, createdAt) VALUES (?,?,?,?,?,?,?)",
       uid(),
       schoolId,
@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       id,
       nowIso()
     );
-    const user = get("SELECT id, name, email, role, phone FROM users WHERE id = ?", id);
+    const user = await get("SELECT id, name, email, role, phone FROM users WHERE id = ?", id);
     return NextResponse.json({ user }, { status: 201 });
   } catch (e) {
     if (isUniqueViolation(e)) {
