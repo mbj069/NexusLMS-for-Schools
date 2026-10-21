@@ -245,12 +245,16 @@ export async function seedDemo(): Promise<void> {
 
   // Wipe any existing demo school (idempotent).
   // class_subjects.teacherId is ON DELETE RESTRICT (deliberate), so clear it
-  // before the cascaded school delete.
+  // before the cascaded school delete. attendance_records.markedById and
+  // announcements.createdById have no ON DELETE action — clear them too so
+  // FK ordering can never block the wipe.
   const existing = await get<{ id: string }>(
     "SELECT id FROM schools WHERE slug = 'demo-academy'"
   );
   if (existing) {
     await run("DELETE FROM class_subjects WHERE schoolId = ?", existing.id);
+    await run("DELETE FROM attendance_records WHERE schoolId = ?", existing.id);
+    await run("DELETE FROM announcements WHERE schoolId = ?", existing.id);
     await run("DELETE FROM schools WHERE id = ?", existing.id);
   }
 

@@ -52,7 +52,11 @@ if (existing) {
   console.log("Removing existing demo school…");
   // class_subjects.teacherId is ON DELETE RESTRICT (deliberate: never silently
   // drop a teacher's assignments), so clear it before the cascaded school delete.
+  // attendance_records.markedById / announcements.createdById have no ON DELETE
+  // action — clear them too so FK ordering can never block the wipe.
   await run("DELETE FROM class_subjects WHERE schoolId = ?", existing.id);
+  await run("DELETE FROM attendance_records WHERE schoolId = ?", existing.id);
+  await run("DELETE FROM announcements WHERE schoolId = ?", existing.id);
   await run("DELETE FROM schools WHERE id = ?", existing.id);
 }
 

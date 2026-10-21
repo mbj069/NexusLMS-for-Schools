@@ -99,4 +99,49 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PUT(req: NextRequest) {
+  try {
+    const session = await requireAuth("SCHOOL_ADMIN");
+    const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
+    const { id, teacherId } = await req.json();
+    if (!id || !teacherId) {
+      return NextResponse.json({ error: "id and teacherId are required" }, { status: 400 });
+    }
+    const existing = await get(
+      "SELECT id FROM class_subjects WHERE id = ? AND schoolId = ?", id, schoolId
+    );
+    if (!existing) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    const teacher = await get<{ id: string; name: string }>(
+      "SELECT id, name FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER'",
+      teacherId, schoolId
+    );
+    if (!teacher) {
+      return NextResponse.json({ error: "Teacher not found in this school" }, { status: 404 });
+    }
+    await run("UPDATE class_subjects SET teacherId = ? WHERE id = ?", teacherId, id);
+    return NextResponse.json({ updated: true, teacher: { id: teacher.id, name: teacher.name } });
+  } catch (e) {
+    return toErrorResponse(e);
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await requireAuth("SCHOOL_ADMIN");
+    const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+    const existing = await get(
+      "SELECT id FROM class_subjects WHERE id = ? AND schoolId = ?", id, schoolId
+    );
+    if (!existing) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    // Lessons, assignments, quizzes and grades for it go too (CASCADE);
+    // timetable slots become free periods (SET NULL).
+    await run("DELETE FROM class_subjects WHERE id = ?", id);
+    return NextResponse.json({ deleted: true });
+  } catch (e) {
+    return toErrorResponse(e);
+  }
+}
+
 export const dynamic = "force-dynamic";

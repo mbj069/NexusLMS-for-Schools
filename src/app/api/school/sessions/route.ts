@@ -82,4 +82,71 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PUT(req: NextRequest) {
+  try {
+    const session = await requireAuth("SCHOOL_ADMIN");
+    const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
+    const { id, name, startDate, endDate, isCurrent } = await req.json();
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+    const existing = await get<{ id: string }>(
+      "SELECT id FROM academic_sessions WHERE id = ? AND schoolId = ?", id, schoolId
+    );
+    if (!existing) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+    const updates: string[] = [];
+    const params: (string | number)[] = [];
+    if (name !== undefined && String(name).trim()) {
+      const clash = await get(
+        "SELECT id FROM academic_sessions WHERE schoolId = ? AND name = ? AND id != ?",
+        schoolId, String(name).trim(), id
+      );
+      if (clash) return NextResponse.json({ error: "A session with that name already exists" }, { status: 409 });
+      updates.push("name = ?");
+      params.push(String(name).trim());
+    }
+    if (startDate) { updates.push("startDate = ?"); params.push(new Date(startDate).toISOString()); }
+    if (endDate) { updates.push("endDate = ?"); params.push(new Date(endDate).toISOString()); }
+
+    await transaction(async () => {
+      if (isCurrent) {
+        await run("UPDATE academic_sessions SET isCurrent = 0 WHERE schoolId = ?", schoolId);
+        updates.push("isCurrent = 1");
+      } else if (isCurrent === false) {
+        updates.push("isCurrent = 0");
+      }
+      if (updates.length > 0) {
+        await run(`UPDATE academic_sessions SET ${updates.join(", ")} WHERE id = ?`, ...params, id);
+      }
+    });
+    return NextResponse.json({ updated: true });
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      return NextResponse.json({ error: "A session with that name already exists" }, { status: 409 });
+    }
+    return toErrorResponse(e);
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await requireAuth("SCHOOL_ADMIN");
+    const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+    const existing = await get<{ id: string; isCurrent: number }>(
+      "SELECT id, isCurrent FROM academic_sessions WHERE id = ? AND schoolId = ?", id, schoolId
+    );
+    if (!existing) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    const classCount = await get<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM classes WHERE sessionId = ?", id
+    );
+    // Cascades: classes → sections → enrollments / class_subjects / timetable / attendance.
+    // No user rows are touched, so the teacher-assignment RESTRICT never fires.
+    await run("DELETE FROM academic_sessions WHERE id = ?", id);
+    return NextResponse.json({ deleted: true, classesRemoved: classCount?.n ?? 0 });
+  } catch (e) {
+    return toErrorResponse(e);
+  }
+}
+
 export const dynamic = "force-dynamic";

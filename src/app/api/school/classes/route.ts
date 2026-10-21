@@ -98,4 +98,55 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PUT(req: NextRequest) {
+  try {
+    const session = await requireAuth("SCHOOL_ADMIN");
+    const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
+    const { id, name } = await req.json();
+    if (!id || !String(name).trim()) {
+      return NextResponse.json({ error: "id and name are required" }, { status: 400 });
+    }
+    const existing = await get<{ id: string; sessionId: string }>(
+      "SELECT id, sessionId FROM classes WHERE id = ? AND schoolId = ?", id, schoolId
+    );
+    if (!existing) return NextResponse.json({ error: "Class not found" }, { status: 404 });
+    try {
+      await run("UPDATE classes SET name = ? WHERE id = ?", String(name).trim(), id);
+    } catch (e) {
+      if (isUniqueViolation(e)) {
+        return NextResponse.json({ error: "That class already exists in this session" }, { status: 409 });
+      }
+      throw e;
+    }
+    return NextResponse.json({ updated: true });
+  } catch (e) {
+    return toErrorResponse(e);
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await requireAuth("SCHOOL_ADMIN");
+    const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+    const existing = await get("SELECT id FROM classes WHERE id = ? AND schoolId = ?", id, schoolId);
+    if (!existing) return NextResponse.json({ error: "Class not found" }, { status: 404 });
+    const counts = await get<{ sections: number; students: number }>(
+      `SELECT (SELECT COUNT(*) FROM sections WHERE classId = ?) AS sections,
+              (SELECT COUNT(*) FROM enrollments e JOIN sections s ON s.id = e.sectionId WHERE s.classId = ?) AS students`,
+      id, id
+    );
+    // Cascades: sections → enrollments / class_subjects / timetable / attendance.
+    await run("DELETE FROM classes WHERE id = ?", id);
+    return NextResponse.json({
+      deleted: true,
+      sectionsRemoved: counts?.sections ?? 0,
+      studentsRemoved: counts?.students ?? 0,
+    });
+  } catch (e) {
+    return toErrorResponse(e);
+  }
+}
+
 export const dynamic = "force-dynamic";

@@ -63,4 +63,21 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const session = await requireAuth("SCHOOL_ADMIN");
+    const schoolId = requireSchoolScope(session, req.nextUrl.searchParams);
+    const id = req.nextUrl.searchParams.get("id");
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+    const existing = await get(
+      "SELECT id FROM parent_children WHERE id = ? AND schoolId = ?", id, schoolId
+    );
+    if (!existing) return NextResponse.json({ error: "Link not found" }, { status: 404 });
+    await run("DELETE FROM parent_children WHERE id = ?", id);
+    return NextResponse.json({ deleted: true });
+  } catch (e) {
+    return toErrorResponse(e);
+  }
+}
+
 export const dynamic = "force-dynamic";
