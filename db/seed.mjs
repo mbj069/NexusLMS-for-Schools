@@ -50,6 +50,9 @@ if (TURSO_URL) {
 const existing = await get("SELECT id FROM schools WHERE slug = 'demo-academy'");
 if (existing) {
   console.log("Removing existing demo school…");
+  // class_subjects.teacherId is ON DELETE RESTRICT (deliberate: never silently
+  // drop a teacher's assignments), so clear it before the cascaded school delete.
+  await run("DELETE FROM class_subjects WHERE schoolId = ?", existing.id);
   await run("DELETE FROM schools WHERE id = ?", existing.id);
 }
 

@@ -63,6 +63,8 @@ export default async function DashboardPage() {
             <li>Add subjects, then assign each subject to a section with its teacher</li>
             <li>Add users (teachers, students, parents) on the Users page</li>
             <li>Enroll students into sections and link parents to their children</li>
+            <li>Build each section&apos;s weekly timetable (Timetable page)</li>
+            <li>Mark daily attendance (Attendance page)</li>
           </ol>
         </div>
       </Shell>
@@ -91,7 +93,21 @@ export default async function DashboardPage() {
     return (
       <Shell>
         <h1 className="mb-1 text-2xl font-bold">My Classes</h1>
-        <p className="mb-6 text-sm text-slate-500">Subjects you teach this session.</p>
+        <p className="mb-4 text-sm text-slate-500">Subjects you teach this session.</p>
+        <div className="mb-6 flex flex-wrap gap-2">
+          <a
+            href="/dashboard/attendance"
+            className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
+          >
+            Mark attendance
+          </a>
+          <a
+            href="/dashboard/timetable"
+            className="rounded-lg border bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            View timetable
+          </a>
+        </div>
         {teaching.length === 0 ? (
           <div className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500">
             No subjects assigned to you yet. Ask your school admin to assign subjects under Classes &amp; Subjects.
@@ -209,8 +225,10 @@ export default async function DashboardPage() {
                   {l.rollNumber ? ` · Roll no. ${l.rollNumber}` : ""}
                 </div>
               )}
-              <div className="mt-3 text-xs text-slate-400">
-                Attendance, grades and announcements for {l.studentName.split(" ")[0]} appear here in the next phase.
+              <div className="mt-3">
+                <a href="/dashboard/attendance" className="text-sm font-medium text-blue-700 hover:underline">
+                  View {l.studentName.split(" ")[0]}&apos;s attendance →
+                </a>
               </div>
             </div>
           ))}

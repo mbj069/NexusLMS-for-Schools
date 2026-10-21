@@ -17,10 +17,24 @@ const NAV: Record<string, { href: string; label: string }[]> = {
     { href: "/dashboard", label: "Overview" },
     { href: "/dashboard/users", label: "Users" },
     { href: "/dashboard/structure", label: "Classes & Subjects" },
+    { href: "/dashboard/timetable", label: "Timetable" },
+    { href: "/dashboard/attendance", label: "Attendance" },
   ],
-  TEACHER: [{ href: "/dashboard", label: "My Classes" }],
-  STUDENT: [{ href: "/dashboard", label: "My Learning" }],
-  PARENT: [{ href: "/dashboard", label: "My Children" }],
+  TEACHER: [
+    { href: "/dashboard", label: "My Classes" },
+    { href: "/dashboard/timetable", label: "Timetable" },
+    { href: "/dashboard/attendance", label: "Attendance" },
+  ],
+  STUDENT: [
+    { href: "/dashboard", label: "My Learning" },
+    { href: "/dashboard/timetable", label: "Timetable" },
+    { href: "/dashboard/attendance", label: "Attendance" },
+  ],
+  PARENT: [
+    { href: "/dashboard", label: "My Children" },
+    { href: "/dashboard/timetable", label: "Timetable" },
+    { href: "/dashboard/attendance", label: "Attendance" },
+  ],
 };
 
 const ROLE_LABEL: Record<string, string> = {

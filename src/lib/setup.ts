@@ -243,11 +243,14 @@ async function applySchema(): Promise<void> {
 export async function seedDemo(): Promise<void> {
   await applySchema();
 
-  // Wipe any existing demo school (idempotent)
+  // Wipe any existing demo school (idempotent).
+  // class_subjects.teacherId is ON DELETE RESTRICT (deliberate), so clear it
+  // before the cascaded school delete.
   const existing = await get<{ id: string }>(
     "SELECT id FROM schools WHERE slug = 'demo-academy'"
   );
   if (existing) {
+    await run("DELETE FROM class_subjects WHERE schoolId = ?", existing.id);
     await run("DELETE FROM schools WHERE id = ?", existing.id);
   }
 
