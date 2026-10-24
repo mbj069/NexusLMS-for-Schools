@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { all, get, run, uid, isUniqueViolation } from "@/lib/db";
-import { requireAuth, requireSchoolScope, toErrorResponse } from "@/lib/tenant";
+import { requireAuth, requireSchoolScope, toErrorResponse, writeAudit } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
   try {
@@ -87,6 +87,7 @@ export async function DELETE(req: NextRequest) {
     );
     // Cascades class_subjects; timetable slots for them become free periods (SET NULL).
     await run("DELETE FROM subjects WHERE id = ?", id);
+    await writeAudit({ schoolId, userId: session.userId, action: "subject.deleted", entity: "Subject", entityId: id, details: { assignmentsRemoved: assigned?.n ?? 0 } });
     return NextResponse.json({ deleted: true, assignmentsRemoved: assigned?.n ?? 0 });
   } catch (e) {
     return toErrorResponse(e);

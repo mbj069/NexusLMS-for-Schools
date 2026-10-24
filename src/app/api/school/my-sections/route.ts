@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
       `SELECT s.id, s.name, c.name AS className, u.name AS context,
               u.id AS studentId, u.name AS studentName
        FROM parent_children pc
-       JOIN users u ON u.id = pc.studentId
+       JOIN users u ON u.id = pc.studentId AND u.deletedAt IS NULL
        JOIN enrollments e ON e.studentId = u.id
        JOIN sections s ON s.id = e.sectionId
        JOIN classes c ON c.id = s.classId

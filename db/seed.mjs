@@ -11,6 +11,16 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
+// Hardening (Phase 2.6): the demo seed creates publicly-known demo accounts.
+// It must NEVER run against a production database. Local dev and the isolated
+// demo deployment (DEMO_MODE=1) are fine; production requires an explicit
+// ALLOW_PROD_SEED=1, and even then the owner should prefer provisioning a
+// real school instead of seeding demo accounts.
+if (process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "1" && process.env.ALLOW_PROD_SEED !== "1") {
+  console.error("Refusing to seed: NODE_ENV=production and this is not a demo deployment. Set DEMO_MODE=1 for a demo DB, or ALLOW_PROD_SEED=1 if you really mean it.");
+  process.exit(1);
+}
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 

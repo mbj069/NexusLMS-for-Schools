@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         c.name AS className
       FROM class_subjects cs
       JOIN subjects sub ON sub.id = cs.subjectId
-      JOIN users t ON t.id = cs.teacherId
+      JOIN users t ON t.id = cs.teacherId AND t.deletedAt IS NULL
       JOIN sections sec ON sec.id = cs.sectionId
       JOIN classes c ON c.id = sec.classId
       WHERE cs.schoolId = ?`;
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       "SELECT id, name FROM subjects WHERE id = ? AND schoolId = ?", subjectId, schoolId
     );
     const teacher = await get<{ id: string; name: string }>(
-      "SELECT id, name FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER'", teacherId, schoolId
+      "SELECT id, name FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER' AND deletedAt IS NULL AND isActive = 1", teacherId, schoolId
     );
     if (!section || !subject || !teacher) {
       return NextResponse.json({ error: "Section, subject or teacher not found in this school" }, { status: 404 });
@@ -112,7 +112,7 @@ export async function PUT(req: NextRequest) {
     );
     if (!existing) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
     const teacher = await get<{ id: string; name: string }>(
-      "SELECT id, name FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER'",
+      "SELECT id, name FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER' AND deletedAt IS NULL AND isActive = 1",
       teacherId, schoolId
     );
     if (!teacher) {

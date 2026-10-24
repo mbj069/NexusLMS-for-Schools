@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
        FROM timetable_slots ts
        LEFT JOIN class_subjects cs ON cs.id = ts.classSubjectId
        LEFT JOIN subjects sub ON sub.id = cs.subjectId
-       LEFT JOIN users t ON t.id = cs.teacherId
+       LEFT JOIN users t ON t.id = cs.teacherId AND t.deletedAt IS NULL
        WHERE ts.schoolId = ? AND ts.sectionId = ?
        ORDER BY ts.periodNumber ASC, ts.dayOfWeek ASC`,
       schoolId,

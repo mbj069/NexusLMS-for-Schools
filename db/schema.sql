@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT NOT NULL CHECK (role IN ('SUPER_ADMIN','SCHOOL_ADMIN','TEACHER','STUDENT','PARENT')),
   phone TEXT,
   createdAt TEXT NOT NULL,
+  -- Hardening (Phase 2.6): revocation + disable + soft-delete.
+  -- tokenVersion is stamped into every JWT; bumping it (password change,
+  -- disable, restore) invalidates all previously issued tokens immediately.
+  -- isActive = 0 blocks login AND kills existing sessions via the DB check.
+  -- deletedAt = soft-delete: the row stays for audit/restore, but every
+  -- live query must exclude it (see users route + roster/listing joins).
+  tokenVersion INTEGER NOT NULL DEFAULT 0,
+  isActive INTEGER NOT NULL DEFAULT 1,
+  deletedAt TEXT,
   UNIQUE (schoolId, email)
 );
 CREATE INDEX IF NOT EXISTS idx_users_school ON users(schoolId);
@@ -147,6 +156,10 @@ CREATE INDEX IF NOT EXISTS idx_assign_cs ON assignments(classSubjectId);
 
 CREATE TABLE IF NOT EXISTS submissions (
   id TEXT PRIMARY KEY,
+  -- Hardening: schoolId is denormalised here (copied from the assignment)
+  -- so a submission is directly tenant-scoped and directly auditable,
+  -- instead of only reachable through a join that a future query might skip.
+  schoolId TEXT REFERENCES schools(id) ON DELETE CASCADE,
   assignmentId TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
   studentId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
@@ -155,6 +168,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   feedback TEXT,
   UNIQUE (assignmentId, studentId)
 );
+CREATE INDEX IF NOT EXISTS idx_sub_school ON submissions(schoolId);
 
 CREATE TABLE IF NOT EXISTS quizzes (
   id TEXT PRIMARY KEY,
@@ -171,6 +185,7 @@ CREATE INDEX IF NOT EXISTS idx_quiz_cs ON quizzes(classSubjectId);
 
 CREATE TABLE IF NOT EXISTS questions (
   id TEXT PRIMARY KEY,
+  schoolId TEXT REFERENCES schools(id) ON DELETE CASCADE, -- denormalised from quiz, same reason as submissions
   quizId TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
   text TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('MCQ','SHORT')),
@@ -179,9 +194,11 @@ CREATE TABLE IF NOT EXISTS questions (
   marks INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_questions_quiz ON questions(quizId);
+CREATE INDEX IF NOT EXISTS idx_questions_school ON questions(schoolId);
 
 CREATE TABLE IF NOT EXISTS quiz_attempts (
   id TEXT PRIMARY KEY,
+  schoolId TEXT REFERENCES schools(id) ON DELETE CASCADE, -- denormalised from quiz
   quizId TEXT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
   studentId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   answersJson TEXT NOT NULL,
@@ -189,6 +206,7 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   submittedAt TEXT NOT NULL,
   UNIQUE (quizId, studentId)
 );
+CREATE INDEX IF NOT EXISTS idx_attempts_school ON quiz_attempts(schoolId);
 
 CREATE TABLE IF NOT EXISTS grades (
   id TEXT PRIMARY KEY,
@@ -198,6 +216,7 @@ CREATE TABLE IF NOT EXISTS grades (
   term TEXT NOT NULL,
   marksObtained REAL NOT NULL,
   totalMarks REAL NOT NULL,
+  deletedAt TEXT, -- soft-delete: grade history is never silently erased (Phase 3 must respect this)
   UNIQUE (studentId, classSubjectId, term)
 );
 CREATE INDEX IF NOT EXISTS idx_grades_school ON grades(schoolId);
@@ -221,6 +240,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   action TEXT NOT NULL,
   entity TEXT,
   entityId TEXT,
+  -- Hardening: machine-readable before/after detail, e.g.
+  -- {"oldStatus":"PRESENT","newStatus":"ABSENT"} or {"oldMarks":70,"newMarks":75}.
+  -- Never put passwords or tokens here.
+  details TEXT,
   createdAt TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_school ON audit_logs(schoolId);

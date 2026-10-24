@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { all, get, run, uid, nowIso, isUniqueViolation, transaction } from "@/lib/db";
-import { requireAuth, requireSchoolScope, toErrorResponse } from "@/lib/tenant";
+import { requireAuth, requireSchoolScope, toErrorResponse, writeAudit } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
         `SELECT s.id, s.name, s.classTeacherId AS teacherId, u.name AS teacherName,
           (SELECT COUNT(*) FROM enrollments e WHERE e.sectionId = s.id) AS enrollmentCount,
           (SELECT COUNT(*) FROM class_subjects cs WHERE cs.sectionId = s.id) AS subjectCount
-         FROM sections s LEFT JOIN users u ON u.id = s.classTeacherId
+         FROM sections s LEFT JOIN users u ON u.id = s.classTeacherId AND u.deletedAt IS NULL
          WHERE s.classId = ? ORDER BY s.name ASC`,
         c.id
       );
@@ -139,6 +139,7 @@ export async function DELETE(req: NextRequest) {
     );
     // Cascades: sections → enrollments / class_subjects / timetable / attendance.
     await run("DELETE FROM classes WHERE id = ?", id);
+    await writeAudit({ schoolId, userId: session.userId, action: "class.deleted", entity: "Class", entityId: id, details: { sectionsRemoved: counts?.sections ?? 0, studentsRemoved: counts?.students ?? 0 } });
     return NextResponse.json({
       deleted: true,
       sectionsRemoved: counts?.sections ?? 0,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { all, get, run, uid, nowIso, isUniqueViolation, transaction } from "@/lib/db";
-import { requireAuth, requireSchoolScope, toErrorResponse } from "@/lib/tenant";
+import { requireAuth, requireSchoolScope, toErrorResponse, writeAudit } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
   try {
@@ -143,6 +143,7 @@ export async function DELETE(req: NextRequest) {
     // Cascades: classes → sections → enrollments / class_subjects / timetable / attendance.
     // No user rows are touched, so the teacher-assignment RESTRICT never fires.
     await run("DELETE FROM academic_sessions WHERE id = ?", id);
+    await writeAudit({ schoolId, userId: session.userId, action: "session.deleted", entity: "Session", entityId: id, details: { classesRemoved: classCount?.n ?? 0 } });
     return NextResponse.json({ deleted: true, classesRemoved: classCount?.n ?? 0 });
   } catch (e) {
     return toErrorResponse(e);

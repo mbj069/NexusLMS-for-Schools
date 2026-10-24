@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
     }>(
       `SELECT pc.id, p.id AS parentId, p.name AS parentName, s.id AS studentId, s.name AS studentName
        FROM parent_children pc
-       JOIN users p ON p.id = pc.parentId
-       JOIN users s ON s.id = pc.studentId
+       JOIN users p ON p.id = pc.parentId AND p.deletedAt IS NULL
+       JOIN users s ON s.id = pc.studentId AND s.deletedAt IS NULL
        WHERE pc.schoolId = ? ORDER BY p.name ASC`,
       schoolId
     )).map((r) => ({
@@ -39,10 +39,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Parent and student are required" }, { status: 400 });
     }
     const parent = await get(
-      "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'PARENT'", parentId, schoolId
+      "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'PARENT' AND deletedAt IS NULL AND isActive = 1", parentId, schoolId
     );
     const student = await get(
-      "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'STUDENT'", studentId, schoolId
+      "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'STUDENT' AND deletedAt IS NULL AND isActive = 1", studentId, schoolId
     );
     if (!parent || !student) {
       return NextResponse.json({ error: "Parent or student not found in this school" }, { status: 404 });

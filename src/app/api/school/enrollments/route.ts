@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     if (!section) return NextResponse.json({ error: "Section not found" }, { status: 404 });
     const enrollments = (await all<{ id: string; rollNumber: string | null; studentId: string; studentName: string }>(
       `SELECT e.id, e.rollNumber, u.id AS studentId, u.name AS studentName
-       FROM enrollments e JOIN users u ON u.id = e.studentId
+       FROM enrollments e JOIN users u ON u.id = e.studentId AND u.deletedAt IS NULL
        WHERE e.sectionId = ? ORDER BY e.rollNumber ASC`,
       sectionId
     )).map((r) => ({
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
     const section = await get("SELECT id FROM sections WHERE id = ? AND schoolId = ?", sectionId, schoolId);
     const student = await get(
-      "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'STUDENT'",
+      "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'STUDENT' AND deletedAt IS NULL AND isActive = 1",
       studentId, schoolId
     );
     if (!section || !student) {

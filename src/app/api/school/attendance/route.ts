@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { all, get, run, uid } from "@/lib/db";
-import { requireAuth, requireSchoolScope, toErrorResponse } from "@/lib/tenant";
+import { requireAuth, requireSchoolScope, toErrorResponse, writeAudit } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
         if (!ok) return NextResponse.json({ error: "Not your student" }, { status: 403 });
       }
       const student = await get<{ id: string; name: string }>(
-        "SELECT id, name FROM users WHERE id = ? AND schoolId = ? AND role = 'STUDENT'",
+        "SELECT id, name FROM users WHERE id = ? AND schoolId = ? AND role = 'STUDENT' AND deletedAt IS NULL",
         studentId,
         schoolId
       );
@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
 
     const students = await all<{ id: string; name: string; rollNumber: string | null }>(
       `SELECT u.id, u.name, e.rollNumber
-       FROM enrollments e JOIN users u ON u.id = e.studentId
+       FROM enrollments e JOIN users u ON u.id = e.studentId AND u.deletedAt IS NULL
        WHERE e.sectionId = ? AND e.schoolId = ?
        ORDER BY CAST(e.rollNumber AS INTEGER) ASC, u.name ASC`,
       sectionId,
@@ -218,10 +218,24 @@ export async function POST(req: NextRequest) {
       ).map((r) => r.studentId)
     );
 
+    // Audit trail (Phase 2.6): capture the previous status for this day
+    // first, so every change records old -> new, not just the new value.
+    // A parent disputing attendance needs "who changed it, from what, to what".
+    const previous = new Map(
+      (
+        await all<{ studentId: string; status: string }>(
+          "SELECT studentId, status FROM attendance_records WHERE schoolId = ? AND sectionId = ? AND date = ?",
+          schoolId,
+          sectionId,
+          date
+        )
+      ).map((m) => [m.studentId, m.status])
+    );
     let saved = 0;
     for (const r of records) {
       if (!enrolled.has(r.studentId)) continue;
       if (!STATUSES.includes(r.status as (typeof STATUSES)[number])) continue;
+      const oldStatus = previous.get(r.studentId) ?? null;
       await run(
         `INSERT INTO attendance_records
            (id, schoolId, sectionId, date, studentId, status, markedById)
@@ -237,6 +251,14 @@ export async function POST(req: NextRequest) {
         session.userId
       );
       saved++;
+      if (oldStatus !== r.status) {
+        await writeAudit({
+          schoolId, userId: session.userId,
+          action: oldStatus ? "attendance.changed" : "attendance.marked",
+          entity: "Attendance", entityId: `${sectionId}:${date}:${r.studentId}`,
+          details: { sectionId, date, studentId: r.studentId, oldStatus, newStatus: r.status },
+        });
+      }
     }
     return NextResponse.json({ saved, date });
   } catch (e) {

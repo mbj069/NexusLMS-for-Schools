@@ -27,7 +27,7 @@ export async function GET() {
     await requireAuth("SUPER_ADMIN");
     const rows = await all<SchoolRow>(
       `SELECT s.id, s.name, s.slug, s.phone, s.createdAt,
-        (SELECT COUNT(*) FROM users u WHERE u.schoolId = s.id) AS userCount,
+        (SELECT COUNT(*) FROM users u WHERE u.schoolId = s.id AND u.deletedAt IS NULL) AS userCount,
         (SELECT COUNT(*) FROM academic_sessions a WHERE a.schoolId = s.id) AS sessionCount
        FROM schools s ORDER BY s.createdAt DESC`
     );

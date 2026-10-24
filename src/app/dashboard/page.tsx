@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { all, get } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import Shell from "@/components/Shell";
+import ExportButton from "@/components/ExportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,15 @@ export default async function DashboardPage() {
           <Card title="Admins" value={admins} />
           <Card title="Classes" value={classes} hint="across all sessions" />
           <Card title="Sessions" value={sessions.length} />
+        </div>
+        <div className="mt-8 rounded-xl border bg-white p-5">
+          <h2 className="mb-2 font-semibold">Data backup</h2>
+          <p className="mb-4 text-sm text-slate-600">
+            Download your entire school workspace — users, classes, timetable,
+            attendance, assignments, grades and announcements — as a single
+            backup file you keep. Passwords are never included.
+          </p>
+          <ExportButton />
         </div>
         <div className="mt-8 rounded-xl border bg-white p-5">
           <h2 className="mb-2 font-semibold">Getting started checklist</h2>
@@ -152,7 +162,7 @@ export default async function DashboardPage() {
       `SELECT sub.name AS subjectName, t.name AS teacherName, cs.sectionId
        FROM class_subjects cs
        JOIN subjects sub ON sub.id = cs.subjectId
-       JOIN users t ON t.id = cs.teacherId
+       JOIN users t ON t.id = cs.teacherId AND t.deletedAt IS NULL
        JOIN enrollments e ON e.sectionId = cs.sectionId
        WHERE e.studentId = ?
        ORDER BY sub.name ASC`,
@@ -199,7 +209,7 @@ export default async function DashboardPage() {
     `SELECT s.id AS studentId, s.name AS studentName, sec.name AS sectionName,
        c.name AS className, e.rollNumber
      FROM parent_children pc
-     JOIN users s ON s.id = pc.studentId
+     JOIN users s ON s.id = pc.studentId AND s.deletedAt IS NULL
      LEFT JOIN enrollments e ON e.studentId = s.id
      LEFT JOIN sections sec ON sec.id = e.sectionId
      LEFT JOIN classes c ON c.id = sec.classId

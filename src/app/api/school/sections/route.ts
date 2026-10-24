@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { get, run, uid, isUniqueViolation } from "@/lib/db";
-import { requireAuth, requireSchoolScope, toErrorResponse } from "@/lib/tenant";
+import { requireAuth, requireSchoolScope, toErrorResponse, writeAudit } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     let teacherId: string | null = null;
     if (classTeacherId) {
       const t = await get(
-        "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER'",
+        "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER' AND deletedAt IS NULL AND isActive = 1",
         classTeacherId, schoolId
       );
       if (!t) return NextResponse.json({ error: "Teacher not found in this school" }, { status: 404 });
@@ -65,7 +65,7 @@ export async function PUT(req: NextRequest) {
     if (classTeacherId !== undefined) {
       if (classTeacherId) {
         const t = await get(
-          "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER'",
+          "SELECT id FROM users WHERE id = ? AND schoolId = ? AND role = 'TEACHER' AND deletedAt IS NULL AND isActive = 1",
           classTeacherId, schoolId
         );
         if (!t) return NextResponse.json({ error: "Teacher not found in this school" }, { status: 404 });
@@ -106,6 +106,7 @@ export async function DELETE(req: NextRequest) {
     );
     // Cascades: enrollments / class_subjects / timetable / attendance.
     await run("DELETE FROM sections WHERE id = ?", id);
+    await writeAudit({ schoolId, userId: session.userId, action: "section.deleted", entity: "Section", entityId: id, details: { studentsRemoved: counts?.students ?? 0, subjectsRemoved: counts?.subjects ?? 0 } });
     return NextResponse.json({
       deleted: true,
       studentsRemoved: counts?.students ?? 0,
