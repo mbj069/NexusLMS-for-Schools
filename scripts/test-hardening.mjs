@@ -31,11 +31,6 @@ function check(name, ok, detail = "") {
   if (!ok) failures++;
 }
 
-function cookieFrom(res) {
-  const set = res.headers.get("set-cookie") || "";
-  return set.split(";")[0];
-}
-
 async function req(method, url, cookie, body, extraHeaders = {}) {
   const res = await fetch(`${BASE}${url}`, {
     method,
@@ -64,7 +59,7 @@ async function login(email, password) {
   return raw.headers.get("set-cookie")?.split(";")[0] ?? "";
 }
 
-async function waitReady(proc) {
+async function waitReady() {
   for (let i = 0; i < 60; i++) {
     try {
       const r = await fetch(`${BASE}/login`);
@@ -109,10 +104,10 @@ async function main() {
   proc.stdout.on("data", () => {});
   proc.stderr.on("data", () => {});
   try {
-    if (!(await waitReady(proc))) throw new Error("dev server did not become ready");
+    if (!(await waitReady())) throw new Error("dev server did not become ready");
 
     // Demo seed logins are the seed's own accounts (school A = Demo Academy).
-    const superCookie = await login("superadmin@nexusms.app", "demo1234");
+    await login("superadmin@nexusms.app", "demo1234");
     const adminA = await login("admin@demo.edu", "demo1234");
     const teacherA = await login("teacher@demo.edu", "demo1234");
     const adminB = await login("adminb@test.edu", "TestPass123");

@@ -43,3 +43,6 @@ next-env.d.ts
 # local sqlite database
 *.db
 *.db-*
+
+# phase 1 concurrency test scratch dir (compiled db.ts)
+.tmp-dbtest/

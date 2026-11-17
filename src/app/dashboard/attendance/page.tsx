@@ -117,35 +117,64 @@ export default function AttendancePage() {
     );
   }, []);
 
-  const loadSummary = useCallback(async (sid: string, m: string) => {
-    if (!sid || !m) return;
-    const res = await fetch(`/api/school/attendance?sectionId=${sid}&month=${m}`).then((r) => r.json());
-    setSummary(res.summary ?? []);
-  }, []);
+  // Declared before the effects below — the render's parent picker reads it.
+  const children = [...new Map(sections.filter((s) => s.studentId).map((s) => [s.studentId!, s])).values()];
 
-  const loadSingle = useCallback(async (sid: string, m: string, label: string) => {
-    if (!sid || !m) return;
-    const res = await fetch(`/api/school/attendance?studentId=${sid}&month=${m}`).then((r) => r.json());
-    if (res.student) setSingle({ summary: res.summary, records: res.records ?? [], name: label });
-    else setSingle(null);
-  }, []);
-
+  // Section view (mark / summary), inlined so the state updates happen
+  // after an await inside the effect (react-hooks/set-state-in-effect
+  // forbids calling the shared loaders — which set state — from the effect
+  // body). loadRoster() itself stays for the save handler below.
   useEffect(() => {
     if (!canMark || !sectionId) return;
-    if (tab === "mark") loadRoster(sectionId, date);
-    else loadSummary(sectionId, month);
-  }, [sectionId, date, month, tab, canMark, loadRoster, loadSummary]);
+    let cancelled = false;
+    (async () => {
+      if (tab === "mark") {
+        const res = await fetch(`/api/school/attendance?sectionId=${sectionId}&date=${date}`).then((r) => r.json());
+        if (cancelled) return;
+        const rows: RosterRow[] = res.roster ?? [];
+        setRoster(rows);
+        const m: Record<string, string> = {};
+        for (const r of rows) if (r.status) m[r.studentId] = r.status;
+        setMarks(m);
+        setMsg(
+          res.markedCount > 0 && res.markedCount === rows.length
+            ? `Attendance already marked for ${date} — editing will overwrite it.`
+            : ""
+        );
+      } else {
+        const res = await fetch(`/api/school/attendance?sectionId=${sectionId}&month=${month}`).then((r) => r.json());
+        if (cancelled) return;
+        setSummary(res.summary ?? []);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sectionId, date, month, tab, canMark]);
 
+  // Single-student view for students and parents, inlined the same way.
+  // The child's name is read from `sections` (stable state reference) rather
+  // than `children` (a fresh array every render, which would refetch in a loop).
   useEffect(() => {
-    if (role === "STUDENT" && meId) loadSingle(meId, month, "My");
-    if (role === "PARENT" && childId) {
-      const c = children.find((x) => x.studentId === childId);
-      loadSingle(childId, month, c?.studentName ?? "");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, meId, childId, month]);
-
-  const children = [...new Map(sections.filter((s) => s.studentId).map((s) => [s.studentId!, s])).values()];
+    let cancelled = false;
+    (async () => {
+      if (role === "STUDENT" && meId) {
+        const res = await fetch(`/api/school/attendance?studentId=${meId}&month=${month}`).then((r) => r.json());
+        if (cancelled) return;
+        if (res.student) setSingle({ summary: res.summary, records: res.records ?? [], name: "My" });
+        else setSingle(null);
+      } else if (role === "PARENT" && childId) {
+        const res = await fetch(`/api/school/attendance?studentId=${childId}&month=${month}`).then((r) => r.json());
+        if (cancelled) return;
+        const c = sections.find((x) => x.studentId === childId);
+        if (res.student) setSingle({ summary: res.summary, records: res.records ?? [], name: c?.studentName ?? "" });
+        else setSingle(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [role, meId, childId, month, sections]);
 
   function setMark(id: string, v: string) {
     setMarks((m) => ({ ...m, [id]: v }));

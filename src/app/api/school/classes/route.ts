@@ -68,11 +68,11 @@ export async function POST(req: NextRequest) {
       Array.isArray(sections) && sections.length > 0 ? sections : ["A"];
     const classId = uid();
     try {
-      await transaction(async () => {
-        await run("INSERT INTO classes (id, schoolId, sessionId, name) VALUES (?,?,?,?)",
+      await transaction(async (tx) => {
+        await tx.run("INSERT INTO classes (id, schoolId, sessionId, name) VALUES (?,?,?,?)",
           classId, schoolId, sessionId, String(name).trim());
         for (const s of names) {
-          await run("INSERT INTO sections (id, schoolId, classId, name) VALUES (?,?,?,?)",
+          await tx.run("INSERT INTO sections (id, schoolId, classId, name) VALUES (?,?,?,?)",
             uid(), schoolId, classId, String(s).trim() || "A");
         }
       });

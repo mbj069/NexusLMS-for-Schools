@@ -18,7 +18,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
-import { randomBytes } from "node:crypto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -44,19 +43,17 @@ if (payload.product !== "NexusLMS" || !payload.data || !payload.school) {
   process.exit(1);
 }
 const data = payload.data;
-const uid = () => randomBytes(12).toString("hex");
 const now = () => new Date().toISOString();
 const passwordHash = bcrypt.hashSync(password, 12);
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
-let run, get, all, close;
+let run, get, close;
 if (TURSO_URL) {
   const { createClient } = await import("@libsql/client");
   const client = createClient({ url: TURSO_URL, authToken: TURSO_TOKEN });
   run = async (sql, ...params) => { await client.execute({ sql, args: params }); };
   get = async (sql, ...params) => (await client.execute({ sql, args: params })).rows[0];
-  all = async (sql, ...params) => (await client.execute({ sql, args: params })).rows;
   close = async () => client.close();
   console.log(`Restoring into Turso database ${TURSO_URL}`);
 } else {
@@ -69,7 +66,6 @@ if (TURSO_URL) {
   db.exec("PRAGMA foreign_keys = OFF;");
   run = (sql, ...params) => db.prepare(sql).run(...params);
   get = (sql, ...params) => db.prepare(sql).get(...params);
-  all = (sql, ...params) => db.prepare(sql).all(...params);
   close = () => db.close();
   console.log(`Restoring into ${dbPath}`);
 }

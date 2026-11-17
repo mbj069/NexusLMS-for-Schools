@@ -51,8 +51,24 @@ export default function UsersPage() {
     setLinks(l.links ?? []);
   }
 
+  // Mount fetch, inlined so the state updates happen after an await inside
+  // the effect (react-hooks/set-state-in-effect forbids calling the shared
+  // load() — which sets state — from the effect body). load() itself stays
+  // for the add/edit/delete handlers below.
   useEffect(() => {
-    load();
+    let cancelled = false;
+    (async () => {
+      const [u, l] = await Promise.all([
+        fetch("/api/school/users").then((r) => r.json()),
+        fetch("/api/school/parent-links").then((r) => r.json()),
+      ]);
+      if (cancelled) return;
+      setUsers(u.users ?? []);
+      setLinks(l.links ?? []);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function addUser(e: React.FormEvent) {

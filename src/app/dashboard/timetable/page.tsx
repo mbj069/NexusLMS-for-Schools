@@ -37,10 +37,6 @@ interface Slot {
 const input =
   "rounded-lg border px-3 py-2 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600";
 
-function toMin(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
 function toHM(min: number): string {
   const h = Math.floor(min / 60) % 24;
   const m = min % 60;
@@ -117,9 +113,46 @@ export default function TimetablePage() {
     [isAdmin]
   );
 
+  // Section fetch, inlined so the state updates happen after an await
+  // inside the effect (react-hooks/set-state-in-effect forbids calling the
+  // shared loadSection() — which sets state — from the effect body).
+  // loadSection() itself stays for the save handlers below.
   useEffect(() => {
-    if (sectionId) loadSection(sectionId);
-  }, [sectionId, loadSection]);
+    if (!sectionId) return;
+    let cancelled = false;
+    (async () => {
+      const [sRes, cRes] = await Promise.all([
+        fetch(`/api/school/timetable?sectionId=${sectionId}`).then((r) => r.json()),
+        isAdmin
+          ? fetch(`/api/school/class-subjects?sectionId=${sectionId}`).then((r) => r.json())
+          : Promise.resolve({ classSubjects: [] }),
+      ]);
+      if (cancelled) return;
+      const loaded: Slot[] = sRes.slots ?? [];
+      setSlots(loaded);
+      setSubjects(cRes.classSubjects ?? []);
+      if (isAdmin) {
+        const maxP = loaded.reduce((m, s) => Math.max(m, s.periodNumber), 0);
+        const n = Math.max(8, maxP);
+        setPeriodCount(n);
+        const t = defaultTimes(n);
+        for (const s of loaded) {
+          const i = s.periodNumber - 1;
+          if (t[i]) t[i] = { start: s.startTime, end: s.endTime };
+        }
+        setTimes(t);
+        const g: Record<string, string> = {};
+        for (const s of loaded) {
+          if (s.classSubjectId) g[`${s.dayOfWeek}:${s.periodNumber}`] = s.classSubjectId;
+        }
+        setGrid(g);
+      }
+      setMsg("");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sectionId, isAdmin]);
 
   function setTime(i: number, field: "start" | "end", v: string) {
     setTimes((t) => t.map((x, j) => (j === i ? { ...x, [field]: v } : x)));

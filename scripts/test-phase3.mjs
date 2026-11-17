@@ -90,7 +90,6 @@ async function main() {
     // Teacher A's class subjects (Math + English, Section A)
     const csA = await req("GET", "/api/school/my-class-subjects", teacherA);
     const mathCs = (csA.json?.classSubjects ?? []).find((c) => c.subject.name === "Mathematics");
-    const sciCs = (csA.json?.classSubjects ?? []).find((c) => c.subject.name === "Science");
     check("teacher A sees Math class-subject", !!mathCs, JSON.stringify(csA.json).slice(0, 200));
     check("teacher2 does NOT teach Math (teacher A does)", !(csA.json?.classSubjects ?? []).some((c) => c.subject.name === "Mathematics" && c.teacher.name === "Sara Malik"), "");
 
@@ -145,6 +144,7 @@ async function main() {
     // --- Cross-tenant (school B) ------------------------------------------------
     const sessB = await req("POST", "/api/school/sessions", adminB, { name: "2026-27", startDate: "2026-04-01", endDate: "2027-03-31", isCurrent: true });
     const classB = await req("POST", "/api/school/classes", adminB, { name: "Grade 9", sessionId: sessB.json?.session?.id ?? sessB.json?.id, sections: ["A"] });
+    check("school B class created", classB.status === 201, `status=${classB.status} ${classB.text.slice(0, 200)}`);
     const classesB = await req("GET", "/api/school/classes", adminB);
     const sectionBId = classesB.json?.classes?.[0]?.sections?.[0]?.id;
     const subjB = await req("POST", "/api/school/subjects", adminB, { name: "History" });

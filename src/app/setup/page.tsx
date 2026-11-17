@@ -6,7 +6,7 @@ export default function SetupPage() {
   const [key, setKey] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{ logins?: string[]; message?: string; error?: string } | null>(null);
 
   async function runSetup() {
     setBusy(true);

@@ -75,7 +75,39 @@ export default function StructurePage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  // Mount fetch, inlined so the state updates happen after an await inside
+  // the effect (react-hooks/set-state-in-effect forbids calling the shared
+  // load() — which sets state — from the effect body). load() itself stays
+  // for the add/edit/delete handlers below. The active-session pick uses the
+  // functional setState form so it reads no state from the effect closure.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [s, c, sub, cs, u] = await Promise.all([
+        fetch("/api/school/sessions").then((r) => r.json()),
+        fetch("/api/school/classes").then((r) => r.json()),
+        fetch("/api/school/subjects").then((r) => r.json()),
+        fetch("/api/school/class-subjects").then((r) => r.json()),
+        fetch("/api/school/users").then((r) => r.json()),
+      ]);
+      if (cancelled) return;
+      setSessions(s.sessions ?? []);
+      setClasses(c.classes ?? []);
+      setSubjects(sub.subjects ?? []);
+      setClassSubjects(cs.classSubjects ?? []);
+      const all: User[] = u.users ?? [];
+      setTeachers(all.filter((x) => x.role === "TEACHER"));
+      setStudents(all.filter((x) => x.role === "STUDENT"));
+      setActiveSession((prev) => {
+        if (prev) return prev;
+        const cur = (s.sessions ?? []).find((x: Session) => x.isCurrent) ?? (s.sessions ?? [])[0];
+        return cur ? cur.id : prev;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function post(url: string, body: object) {
     setError("");

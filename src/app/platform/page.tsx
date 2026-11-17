@@ -30,8 +30,24 @@ export default function PlatformPage() {
     setLoading(false);
   }
 
+  // Mount fetch, inlined so the state updates happen after an await inside
+  // the effect (react-hooks/set-state-in-effect forbids calling the shared
+  // load() — which sets state — from the effect body). load() itself stays
+  // for the create handler below.
   useEffect(() => {
-    load();
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/platform/schools");
+      if (cancelled) return;
+      if (res.ok) {
+        const data = await res.json();
+        setSchools(data.schools);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function create(e: React.FormEvent) {
@@ -94,7 +110,7 @@ export default function PlatformPage() {
         </form>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         <p className="mt-2 text-xs text-slate-500">
-          Next: sign in as that school's admin (created via the demo seed or the
+          Next: sign in as that school&rsquo;s admin (created via the demo seed or the
           Users page) to finish setup — sessions, classes, teachers, students.
         </p>
       </div>

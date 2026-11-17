@@ -41,11 +41,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "A session with that name already exists" }, { status: 409 });
     }
     const id = uid();
-    await transaction(async () => {
+    await transaction(async (tx) => {
       if (isCurrent) {
-        await run("UPDATE academic_sessions SET isCurrent = 0 WHERE schoolId = ?", schoolId);
+        await tx.run("UPDATE academic_sessions SET isCurrent = 0 WHERE schoolId = ?", schoolId);
       }
-      await run(
+      await tx.run(
         "INSERT INTO academic_sessions (id, schoolId, name, startDate, endDate, isCurrent) VALUES (?,?,?,?,?,?)",
         id,
         schoolId,
@@ -107,15 +107,15 @@ export async function PUT(req: NextRequest) {
     if (startDate) { updates.push("startDate = ?"); params.push(new Date(startDate).toISOString()); }
     if (endDate) { updates.push("endDate = ?"); params.push(new Date(endDate).toISOString()); }
 
-    await transaction(async () => {
+    await transaction(async (tx) => {
       if (isCurrent) {
-        await run("UPDATE academic_sessions SET isCurrent = 0 WHERE schoolId = ?", schoolId);
+        await tx.run("UPDATE academic_sessions SET isCurrent = 0 WHERE schoolId = ?", schoolId);
         updates.push("isCurrent = 1");
       } else if (isCurrent === false) {
         updates.push("isCurrent = 0");
       }
       if (updates.length > 0) {
-        await run(`UPDATE academic_sessions SET ${updates.join(", ")} WHERE id = ?`, ...params, id);
+        await tx.run(`UPDATE academic_sessions SET ${updates.join(", ")} WHERE id = ?`, ...params, id);
       }
     });
     return NextResponse.json({ updated: true });
